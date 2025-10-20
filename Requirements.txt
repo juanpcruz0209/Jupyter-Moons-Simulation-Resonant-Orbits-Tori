@@ -1,0 +1,15 @@
+# Requirements para Simulación de 4-Cuerpos
+# Python 3.8+ compatible
+
+# Cálculo numérico y arrays
+numpy>=1.21.0
+
+# Visualización y gráficos
+matplotlib>=3.5.0
+
+# Constantes astronómicas y unidades
+astropy>=5.0
+
+# Para desarrollo (opcional)
+jupyter>=1.0.0
+ipython>=8.0.0
