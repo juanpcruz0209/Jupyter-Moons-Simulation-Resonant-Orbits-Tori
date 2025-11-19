@@ -33,7 +33,7 @@ DATA_EUROPA = {
     'radius_km': 1560.8
 }
 
-# --- GANYMEDE (Extraído de tu string original) ---
+# --- GANYMEDE
 DATA_GANYMEDE = {
     'r': np.array([8.626133793413050e8, -6.313676115858576e8, -1.178962605631183e4]),
     'v': np.array([6.431976727831559e3, 8.781079262403239e3, 4.266350959168634e2]),
@@ -143,7 +143,7 @@ def velocity_to_momentum(x, y, vx, vy, t, eps):
     return vx - n_t*y, vy + n_t*x
 
 # =============================================================================
-# 4. EVENTOS (USAN ACTIVE_CONFIG)
+# 4. EVENTOS 
 # =============================================================================
 def crash_jupiter(t, s, m, e): 
     # Usa el radio calculado dinámicamente en setup_system
@@ -238,7 +238,7 @@ def run_integrated_file_generator():
             try:
                 sol = solve_ivp(
                     equations_of_motion_hamiltonian, (0, TEST_DURATION), state,
-                    args=(mu, eps), method='RK45',
+                    args=(mu, eps), method='DOP853',
                     events=EVENTS_LIST,
                     rtol=1e-6, atol=1e-8
                 )
@@ -314,4 +314,5 @@ if __name__ == "__main__":
         if choice == '1': 
             run_integrated_file_generator()
         elif choice == '0': 
+
             break
