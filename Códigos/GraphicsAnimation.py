@@ -3,210 +3,200 @@
 
 """
 Python script to animate the Jupiter-Europa-Ganymede system.
-Migrated from a Jupyter Notebook.
-
-This script loads simulation data from a .npz file and generates
-a 3D animation of the orbits with a galactic background.
+Optimized version: Uses loops and structures instead of manual repetition.
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.animation import FuncAnimation
-import random
 import os
 
 def main():
-    """Main function to encapsulate the script's logic."""
-    
     # --- 1. Load Data ---
-    # Define the relative path to the simulation data file.
-    path = os.path.join('..', 'SimulatedData', 'DataIoEuropeGanimedeJupyter688H.npz')
+    filename = 'Elliptical_Ganymede_Ten_Spacecrafts.npz'
+    path = os.path.join('..', 'SimulatedData', filename)
     
     print(f"Loading data from: {os.path.abspath(path)}")
+    
+    if not os.path.exists(path):
+        print(f" ✗ Error! File not found at {os.path.abspath(path)}")
+        return
+
     try:
-        data = np.load(path)
-        # Load the 'positions' array. Assumes 'posiciones' is the key.
-        positions = data['positions'] 
-    except FileNotFoundError:
-        print(f"  ✗ Error! File not found at {os.path.abspath(path)}")
-        print("  - Please check that the path and filename are correct.")
+        with np.load(path) as data:
+            # Check keys safely
+            if 'positions' not in data and 'posiciones' in data:
+                positions = data['posiciones']
+            elif 'positions' in data:
+                positions = data['positions']
+            else:
+                print(f" ✗ Error! Keys found: {list(data.keys())}")
+                return
+    except Exception as e:
+        print(f" ✗ Error loading data: {e}")
         return
-    except KeyError:
-        print("  ✗ Error! The .npz file does not contain the key 'posiciones'.")
-        print(f"  - Keys found in file: {list(data.keys())}")
-        return
 
-    print("  ✓ Data loaded successfully.")
+    print(" ✓ Data loaded successfully.")
+    
+    # shape of positions: (frames, bodies, 3)
+    num_frames, num_bodies, _ = positions.shape
+    print(f"   Frames: {num_frames}, Bodies: {num_bodies}")
 
-    # Extract position data for each body.
-    # Based on the labels later, 0=Jupyter, 1=Europe, 2=Spacecraft
-    x_body0 = positions[:, 0, 0]
-    y_body0 = positions[:, 0, 1]
-    z_body0 = positions[:, 0, 2]
+    # --- Configuration for Bodies ---
+    # Define specific styles for the first 4 bodies (Planets/Moons)
+    # and a generic logic or list for the spacecrafts.
+    
+    # Colors for spacecrafts (SC_1 to SC_10) based on your original hex codes
+    sc_colors = [
+        '#440154', '#482878', '#3e4989', '#31688e', '#26828e', 
+        '#1f9e89', '#35b779', '#6dcd59', '#b4de2c', '#fde725'
+    ]
 
-    x_body1 = positions[:, 1, 0]
-    y_body1 = positions[:, 1, 1]
-    z_body1 = positions[:, 1, 2]
+    # Build a configuration list for all bodies
+    bodies_config = []
+    
+    # Main Bodies (Indices 0-3)
+    bodies_config.append({'label': 'Jupiter',  'color': 'sandybrown', 'size': 10}) # 0
+    #bodies_config.append({'label': 'Europa',   'color': 'coral',      'size': 6})  # 1
+    #bodies_config.append({'label': 'Io',       'color': 'beige',      'size': 6})  # 2
+    bodies_config.append({'label': 'Ganymede', 'color': 'olive',      'size': 6})  # 3
 
-    x_body2 = positions[:, 2, 0]
-    y_body2 = positions[:, 2, 1]
-    z_body2 = positions[:, 2, 2]
-
-    x_body3 = positions[:, 3, 0]
-    y_body3 = positions[:, 3, 1]
-    z_body3 = positions[:, 3, 2]
-
-    # Get the total number of time steps (frames) from the data.
-    num_frames = len(x_body0)
+    # Spacecrafts (Indices 4+)
+    for i in range(4, num_bodies):
+        sc_idx = i - 4
+        color = sc_colors[sc_idx % len(sc_colors)] # Cycle colors if we have more SCs than colors
+        bodies_config.append({
+            'label': f'SC_{sc_idx + 1}',
+            'color': color,
+            'size': 5
+        })
 
     # --- 2. Configure Figure and 3D Axes ---
     print("Configuring figure and galactic background...")
     fig = plt.figure(figsize=(9, 9))
     ax = fig.add_subplot(111, projection='3d')
 
-    # --- Galactic Background Setup ---
-    # Set the figure and axes background color to black.
+    # Styling
     fig.patch.set_facecolor('black')
     ax.set_facecolor('black')
-
-    # Disable the 3D axis panes (the grey "walls") to make them transparent.
     ax.xaxis.pane.fill = False
     ax.yaxis.pane.fill = False
     ax.zaxis.pane.fill = False
-    # Disable the grid lines.
     ax.grid(False)
 
-    # --- Dynamic Axis Limits Calculation ---
-    # Find the min/max values across all bodies and axes to set the view.
-    x_min, x_max = positions[:, :, 0].min(), positions[:, :, 0].max()
-    y_min, y_max = positions[:, :, 1].min(), positions[:, :, 1].max()
-    z_min, z_max = positions[:, :, 2].min(), positions[:, :, 2].max()
+    # --- Calculate View Limits ---
+    # Vectorized min/max calculation over all bodies and frames
+    all_pos = positions.reshape(-1, 3)
+    mins = all_pos.min(axis=0)
+    maxs = all_pos.max(axis=0)
+    margins = (maxs - mins) * 0.1
 
-    # Add a 10% margin to each axis limit for better visibility.
-    x_margin = (x_max - x_min) * 0.1
-    y_margin = (y_max - y_min) * 0.1
-    z_margin = (z_max - z_min) * 0.1
+    # Handle 2D case (flat simulation)
+    margins[margins == 0] = 1.0
 
-    # Define the final view limits.
-    view_xlim = (x_min - x_margin, x_max + x_margin)
-    view_ylim = (y_min - y_margin, y_max + y_margin)
-    view_zlim = (z_min - z_margin, z_max + z_margin)
-    
-    # Handle flat (2D) simulations: add a small buffer if margin is 0.
-    if x_margin == 0: view_xlim = (x_min - 1, x_max + 1)
-    if y_margin == 0: view_ylim = (y_min - 1, y_max + 1)
-    if z_margin == 0: view_zlim = (z_min - 1, z_max + 1)
+    view_lims = list(zip(mins - margins, maxs + margins))
+    ax.set_xlim(view_lims[0])
+    ax.set_ylim(view_lims[1])
+    ax.set_zlim(view_lims[2])
 
     # --- Starfield Generation ---
-    # Define a volume for stars 1.5x larger than the view, to give depth.
-    star_extension = 1.5
-    star_xlim = (view_xlim[0] * star_extension, view_xlim[1] * star_extension)
-    star_ylim = (view_ylim[0] * star_extension, view_ylim[1] * star_extension)
-    star_zlim = (view_zlim[0] * star_extension, view_zlim[1] * star_extension)
-
-    # Generate 1000 random stars.
+    star_ext = 1.5
     n_stars = 1000
-    stars_x = np.random.uniform(*star_xlim, n_stars)
-    stars_y = np.random.uniform(*star_ylim, n_stars)
-    stars_z = np.random.uniform(*star_zlim, n_stars)
+    for i, (vmin, vmax) in enumerate(view_lims):
+        # Simple star generation logic per axis
+        center = (vmax + vmin) / 2
+        span = (vmax - vmin) * star_ext
+        # We generate stars generically for x, y, z
+        # Note: reusing variable names strictly for plotting logic
+        if i == 0: stars_x = np.random.uniform(center - span/2, center + span/2, n_stars)
+        if i == 1: stars_y = np.random.uniform(center - span/2, center + span/2, n_stars)
+        if i == 2: stars_z = np.random.uniform(center - span/2, center + span/2, n_stars)
+
     star_sizes = np.random.uniform(0.1, 1.0, n_stars)
-    
-    # Plot the stars as a faint, white scatter plot.
     ax.scatter(stars_x, stars_y, stars_z, s=star_sizes, c='snow', alpha=0.25)
-    # --- End of background section ---
 
-    # --- 3. Draw Orbits and Initial Points ---
-    print("Drawing orbits and initial points...")
-    # Plot the full trajectory (trace) for Europe and Spacecraft as faint lines.
-    ax.plot(x_body1, y_body1, z_body1,  color='lightgrey', linewidth=0.5, linestyle=':')
-    ax.plot(x_body2, y_body2, z_body2,  color='lightgrey', linewidth=0.5, linestyle=':')
-    ax.plot(x_body3, y_body3, z_body3,  color='lightgrey', linewidth=0.5, linestyle=':')
+    # --- 3. Draw Initial Artists ---
+    print("Initializing graphics...")
+    
+    # Draw trails for Europa (1) and Io (2) - optional logic
+    # You can loop this if you want trails for everyone
+    for i in [1, 2]:
+        ax.plot(positions[:, i, 0], positions[:, i, 1], positions[:, i, 2],
+                color='lightgrey', linewidth=0.5, linestyle=':')
 
-    # Create the animated points (artists) for each body with labels.
-    point_body0, = ax.plot([x_body0[0]], [y_body0[0]], [z_body0[0]], 'o', markersize=10, color='sandybrown', label='Jupyter')
-    point_body1, = ax.plot([x_body1[0]], [y_body1[0]], [z_body1[0]], 'o', markersize=6, color='coral', label='Ío')
-    point_body2, = ax.plot([x_body2[0]], [y_body2[0]], [z_body2[0]], 'o', markersize=6, color='beige', label='Europe')
-    point_body3, = ax.plot([x_body3[0]], [y_body3[0]], [z_body3[0]], 'o', markersize=6, color='olive', label='Ganymede')
-    # --- 4. Final Plot Configuration ---
-    # Set labels and title with white text to be visible on the black background.
+    # Initialize points list to store the "Artist" objects
+    points = []
+    
+    for i, cfg in enumerate(bodies_config):
+        # Initial position: Frame 0, Body i
+        p, = ax.plot([positions[0, i, 0]], 
+                     [positions[0, i, 1]], 
+                     [positions[0, i, 2]], 
+                     'o', 
+                     markersize=cfg['size'], 
+                     color=cfg['color'], 
+                     label=cfg['label'])
+        points.append(p)
+
+    # Labels and Style
     ax.set_xlabel('IRU', color='white')
     ax.set_ylabel('IRU', color='white')
     ax.set_zlabel('IRU', color='white')
-    ax.set_title('Jupyter-Ío-Europe-Ganymede System, 688 hours', color='white')
-
-    # Set the color of the axis tick marks and labels to white.
+    ax.set_title('Jupiter System Dynamics', color='white')
     ax.tick_params(axis='x', colors='white')
     ax.tick_params(axis='y', colors='white')
     ax.tick_params(axis='z', colors='white')
-
-    # Create the legend and set its text color to white.
-    legend = ax.legend(loc='upper right')
-    plt.setp(legend.get_texts(), color='white')
-
-    # Apply the calculated "crop" to the axes.
-    ax.set_xlim(view_xlim)
-    ax.set_ylim(view_ylim)
-    ax.set_zlim(view_zlim)
+    
+    # Legend (optional, can get crowded)
+    # legend = ax.legend(loc='upper right', fontsize='small')
+    # plt.setp(legend.get_texts(), color='white')
 
     # --- 5. Animation Functions ---
+    
+    def update_point(frame_idx, body_idx, point_artist):
+        """Helper to update a single point."""
+        # Extract x, y, z for the specific frame and body
+        x = positions[frame_idx, body_idx, 0]
+        y = positions[frame_idx, body_idx, 1]
+        z = positions[frame_idx, body_idx, 2]
+        point_artist.set_data([x], [y])
+        point_artist.set_3d_properties([z])
+
     def init():
-        """Initializes the animation by setting the starting positions."""
-        point_body0.set_data_3d([x_body0[0]], [y_body0[0]], [z_body0[0]])
-        point_body1.set_data_3d([x_body1[0]], [y_body1[0]], [z_body1[0]])
-        point_body2.set_data_3d([x_body2[0]], [y_body2[0]], [z_body2[0]])
-        point_body3.set_data_3d([x_body3[0]], [y_body3[0]], [z_body3[0]])
-        # Return a tuple of the artists to be animated.
-        return (point_body0, point_body1, point_body2,point_body3)
+        """Init function for FuncAnimation."""
+        for i, p in enumerate(points):
+            update_point(0, i, p)
+        return points
 
     def animate(i):
-        """
-Setting `blit=True` means `animate` must return an iterable of artists.
-        """
-        # `i` is the frame index provided by FuncAnimation.
-        point_body0.set_data_3d([x_body0[i]], [y_body0[i]], [z_body0[i]])
-        point_body1.set_data_3d([x_body1[i]], [y_body1[i]], [z_body1[i]])
-        point_body2.set_data_3d([x_body2[i]], [y_body2[i]], [z_body2[i]])
-        point_body3.set_data_3d([x_body3[i]], [y_body3[i]], [z_body3[i]])
-        # Return the tuple of artists that have been updated.
-        return (point_body0, point_body1, point_body2,point_body3)
+        """Update function for each frame."""
+        for body_idx, p in enumerate(points):
+            update_point(i, body_idx, p)
+        return points
 
-    # --- 6. Create, Save, and Show the Animation ---
-    print("Creating animation (FuncAnimation)...")
+    # --- 6. Create, Save, and Show ---
+    print("Creating animation...")
     
-    # Calculate a step size to target ~300 frames for the animation.
-    # This prevents the animation from being too long if num_frames is large.
-    step = max(1, int(num_frames / 300)) # Ensure step is at least 1.
-    frames_to_render = range(0, num_frames, step)
-
-    # Create the animation object.
+    # Step calculation to limit frames for smoother/faster GIF generation
+    target_frames = 300
+    step = max(1, num_frames // target_frames)
+    frames_indices = range(0, num_frames, step)
+    
     anim = FuncAnimation(fig, animate, init_func=init,
-                           frames=frames_to_render, interval=30, blit=True)
-    
-    # --- Save the animation as a GIF ---
-    
-    # Define the output path.
-    output_directory = os.path.join('..', 'AnimatedGraphics')
-    file_name = 'DataEuropeJupyterTest8_270H.gif'
-    full_save_path = os.path.join(output_directory, file_name)
+                         frames=frames_indices, interval=30, blit=True)
 
-    # Create the output directory if it doesn't already exist.
-    os.makedirs(output_directory, exist_ok=True)
+    output_dir = os.path.join('..', 'AnimatedGraphics')
+    os.makedirs(output_dir, exist_ok=True)
+    save_path = os.path.join(output_dir, '10Bodies_Elliptical_Optimized_Ganymede.gif')
 
-    # Save the animation.
-    print(f"Saving animation to {os.path.abspath(full_save_path)}...")
-    print("This may take several minutes.")
-    # `writer='pillow'` is used for saving GIFs. `dpi` controls resolution.
-    anim.save(full_save_path, writer='pillow', fps=20, dpi=100)
-    print("Animation saved successfully!")
+    print(f"Saving animation to: {save_path}")
+    # Added extra_args to ensure clear background handling in some backends
+    anim.save(save_path, writer='pillow', fps=20, dpi=100) 
+    print("✓ Animation saved!")
 
-    # --- Show the animation ---
-    
-    # `plt.show()` opens an interactive window to display the animation.
-    # This is used for .py scripts, unlike `HTML(anim.to_jshtml())` in notebooks.
-    print("Showing animation in a new window. Close the window to end the script.")
+    print("Showing plot window...")
     plt.show()
 
-# Standard boilerplate to run the `main` function when the script is executed.
 if __name__ == "__main__":
     main()

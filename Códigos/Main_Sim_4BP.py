@@ -602,7 +602,7 @@ def export_simulation_data(filename: str, t_array: np.ndarray, positions: np.nda
 if __name__ == "__main__":
     finalTime = 101.77  # Total simulation time (in JTU)
     dt = 0.0001        # Time Step (in JTU)
-    Relative_Path = os.path.join('..', 'JPLData', 'CondInicSim.txt')
+    Relative_Path = os.path.join('..', 'JPLData', 'CondInicSim_GANYMEDE.txt')
 
     # Load and normalize data
     Bodies = load_and_normalize_bodies(Relative_Path, IRU, JTU.value, JMU.value)
@@ -617,7 +617,7 @@ if __name__ == "__main__":
         
         # 1. Define the folder and file name
         output_folder = os.path.join('..', 'SimulatedData')
-        file_name = "DataIoEuropeGanimedeJupyter688H.npz"
+        file_name = "Elliptical_Ganymede_Ten_Spacecrafts.npz"
         full_export_path = os.path.join(output_folder, file_name)
 
         # 2. Ensure the output folder exists
