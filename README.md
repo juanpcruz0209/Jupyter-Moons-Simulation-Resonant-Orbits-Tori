@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a comprehensive Python framework designed to analyze the orbital dynamics of the Jovian system (specifically Jupiter, Europa, and Ganymede). It combines analytical tools from the **Elliptic Restricted Three-Body Problem (ER3BP)** with a robust **N-Body numerical integrator** to study stable orbits, resonant tori, and Lagrangian point (L4) stability.
+This project is a comprehensive Python framework designed to analyze the orbital dynamics of the Jovian system (specifically Jupiter, Europa, and Ganymede). It combines analytical tools from the **Elliptic Restricted Three-Body Problem (ER3BP)** with a **N-Body numerical integrator** to study stable orbits, resonant tori, and Lagrangian point (L4) stability.
 
 The suite allows users to generate precise initial conditions based on stability maps (Poincaré sections), simulate the trajectories using a symplectic integrator, and visualize the results in high-quality 3D animations.
 
